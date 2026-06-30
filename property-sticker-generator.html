@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhilFIDA Property Sticker Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="fonts.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface-2: #f9f8f6;
+    --border: #e2e0da;
+    --border-strong: #c8c6be;
+    --text-primary: #1a1917;
+    --text-secondary: #6b6a65;
+    --text-muted: #9e9d98;
+    --accent: #2563eb;
+    --accent-bg: #eff6ff;
+    --accent-text: #1d4ed8;
+    --success: #16a34a;
+    --success-bg: #f0fdf4;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    width: 28px; height: 28px;
+    background: var(--text-primary);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo svg { color: white; }
+
+  header h1 { font-size: 15px; font-weight: 500; }
+  header span { color: var(--text-muted); font-size: 13px; margin-left: 4px; }
+
+  .container { max-width: 1040px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  /* Steps */
+  .steps { display: flex; gap: 0; margin-bottom: 2.5rem; }
+  .step {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px 8px 12px;
+    border-radius: 0; border: 1px solid var(--border);
+    margin-right: -1px; background: var(--surface);
+    font-size: 13px; color: var(--text-muted); font-weight: 400;
+    cursor: default; white-space: nowrap;
+  }
+  .step:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+  .step:last-child { border-radius: 0 var(--radius) var(--radius) 0; margin-right: 0; }
+  .step .num {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--border); color: var(--text-muted);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 500; flex-shrink: 0;
+  }
+  .step.active { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); z-index: 1; }
+  .step.active .num { background: var(--accent); color: white; }
+  .step.done { color: var(--success); border-color: #86efac; background: var(--success-bg); }
+  .step.done .num { background: var(--success); color: white; }
+
+  /* Panels */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: var(--shadow);
+  }
+  .panel-title {
+    font-size: 13px; font-weight: 500; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin-bottom: 1rem;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--border-strong);
+    border-radius: var(--radius);
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    background: var(--surface-2);
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: var(--accent-bg); }
+  .upload-zone svg { color: var(--text-muted); margin-bottom: 12px; }
+  .upload-zone .uz-title { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+  .upload-zone .uz-sub { color: var(--text-muted); font-size: 13px; }
+  .upload-zone input { display: none; }
+
+  /* File badge */
+  .file-badge {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: var(--success-bg); border: 1px solid #86efac;
+    border-radius: var(--radius); margin-bottom: 1rem;
+    font-size: 13px;
+  }
+  .file-badge .fb-name { font-weight: 500; color: var(--success); }
+  .file-badge .fb-info { color: var(--text-muted); margin-left: auto; }
+  .file-badge button {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); padding: 2px; border-radius: 4px;
+    line-height: 1;
+  }
+  .file-badge button:hover { color: #dc2626; background: #fef2f2; }
+
+  /* Mapping */
+  .mapping-label {
+    font-size: 12px; font-weight: 500; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .field-tag {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 7px 11px;
+    font-size: 13px; font-weight: 500; color: var(--text-primary);
+  }
+  select.col-select {
+    width: 100%; padding: 7px 10px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); font-size: 13px; color: var(--text-primary);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239e9d98' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center;
+    padding-right: 28px; cursor: pointer;
+  }
+  select.col-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
+
+  /* Preview table */
+  .preview-table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    background: var(--surface-2); padding: 8px 12px;
+    text-align: left; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface-2); }
+
+  /* Sticker preview (HTML replica of the printed sticker) */
+  .sticker-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 12px;
+    align-items: flex-start;
+  }
+  .sticker {
+    border: 1.5px solid #555;
+    background: white;
+    padding: 8px 10px 10px;
+    font-family: Cambria, Georgia, 'Times New Roman', serif;
+    color: #2b2b2b;
+    /* width is set inline (2in × scale); height follows the 2:3 ratio */
+    aspect-ratio: 2 / 3;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .sticker .s-title {
+    text-align: center; font-size: 15px;
+    letter-spacing: 0.3px; line-height: 1.05;
+    font-family: 'Arial Black', 'Arial Bold', Arial, sans-serif; font-weight: 900;
+  }
+  .sticker .s-region {
+    text-align: center; font-size: 13px;
+    margin-bottom: 6px; letter-spacing: 0.5px;
+    font-family: 'Arial Black', 'Arial Bold', Arial, sans-serif; font-weight: 900;
+  }
+  .sticker .s-grid { border: 1px solid #777; flex: 1; display: flex; flex-direction: column; }
+  .sticker .s-grid .s-row:not(.desc) { flex: 1; }
+  .sticker .s-grid .s-row.desc { flex: 2.6; }
+  .sticker .s-row { align-items: stretch; }
+  .sticker .s-row {
+    display: grid; grid-template-columns: 42% 58%;
+    border-bottom: 1px solid #aaa;
+  }
+  .sticker .s-row:last-child { border-bottom: none; }
+  .sticker .s-k {
+    padding: 4px 6px; font-weight: 700; font-size: 11px;
+    border-right: 1px solid #aaa; word-break: break-word;
+  }
+  .sticker .s-v {
+    padding: 4px 6px; font-size: 11px; word-break: break-word;
+    min-height: 22px;
+  }
+  .sticker .s-row.desc .s-v, .sticker .s-row.desc .s-k { min-height: 54px; }
+  .sticker .s-years {
+    text-align: center; font-size: 10px; font-weight: 600;
+    padding: 6px 2px; letter-spacing: 0.5px;
+  }
+  .sticker .s-sign {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    margin-top: 4px;
+  }
+  .sticker .s-sign div {
+    text-align: center; font-size: 11px; font-weight: 700;
+    border-top: 1px solid #2b2b2b; padding-top: 2px;
+  }
+  .sticker .s-foot {
+    text-align: center; font-size: 11px; font-weight: 700;
+    font-style: italic; margin-top: 8px; letter-spacing: 0.5px;
+  }
+
+  /* Controls */
+  .controls-row {
+    display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;
+    margin-bottom: 1rem;
+  }
+  .ctrl-group { display: flex; flex-direction: column; gap: 4px; }
+  .ctrl-group label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+  .ctrl-group select, .ctrl-group input {
+    padding: 6px 10px; border: 1px solid var(--border);
+    border-radius: var(--radius); font-size: 13px; background: var(--surface);
+    color: var(--text-primary);
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    transition: all 0.1s; border: 1px solid transparent;
+    line-height: 1.4; text-decoration: none;
+  }
+  .btn-primary { background: var(--text-primary); color: white; border-color: var(--text-primary); }
+  .btn-primary:hover { background: #374151; }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface); color: var(--text-primary); border-color: var(--border-strong); }
+  .btn-secondary:hover { background: var(--surface-2); }
+  .btn-accent { background: var(--accent); color: white; border-color: var(--accent); }
+  .btn-accent:hover { background: #1d4ed8; }
+  .btn-accent:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .hidden { display: none !important; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(26,25,23,0.5);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1.5rem;
+  }
+  .modal-overlay.hidden { display: none !important; }
+  .modal {
+    background: var(--surface); border-radius: 14px;
+    max-width: 520px; width: 100%; padding: 1.75rem;
+    box-shadow: var(--shadow-md);
+  }
+  .modal-icon {
+    width: 48px; height: 48px; border-radius: 12px;
+    background: var(--accent-bg);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 1rem;
+  }
+  .modal h2 { font-size: 18px; font-weight: 600; margin-bottom: 0.75rem; }
+  .modal p { font-size: 14px; color: var(--text-secondary); margin-bottom: 0.75rem; }
+  .modal ul { margin: 0 0 0.75rem 1.1rem; padding: 0; }
+  .modal li { font-size: 13.5px; color: var(--text-secondary); margin-bottom: 6px; line-height: 1.45; }
+  .modal-actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .section-head h2 { font-size: 16px; font-weight: 500; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--text-primary); color: white;
+    padding: 10px 16px; border-radius: var(--radius);
+    font-size: 13px; box-shadow: var(--shadow-md);
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.25s; z-index: 999; pointer-events: none;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  .empty { text-align: center; padding: 3rem; color: var(--text-muted); font-size: 13px; }
+
+  .badge {
+    display: inline-flex; align-items: center; padding: 2px 8px;
+    border-radius: 999px; font-size: 11px; font-weight: 500;
+  }
+  .badge-blue { background: var(--accent-bg); color: var(--accent-text); }
+  .badge-green { background: var(--success-bg); color: var(--success); }
+
+  @media (max-width: 600px) {
+    .steps { overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Startup notice -->
+<div class="modal-overlay" id="intro-modal">
+  <div class="modal">
+    <div class="modal-icon">
+      <svg width="26" height="26" fill="none" stroke="#1d4ed8" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+    </div>
+    <h2>Before you start — prepare a clean Excel file</h2>
+    <p>For the system to read your data correctly, the Excel file must be <strong>clean and headerless</strong>:</p>
+    <ul>
+      <li><strong>Row 1 must be the column names only</strong> (e.g. Property No., Article, Description, Model/Serial No., Amount, Date of Acquisition, Issued to).</li>
+      <li><strong>No title rows above the data</strong> — remove things like "Republic of the Philippines", "PhilFIDA", office numbers, addresses, or contact details.</li>
+      <li><strong>No images</strong> — no logos, signatures, or scanned photos in the sheet.</li>
+      <li><strong>No merged cells or blank spacer rows</strong> — just plain columns of information.</li>
+    </ul>
+    <p style="color:var(--text-muted);font-size:13px;">In short: one header row, then the data. Nothing else.</p>
+    <div class="modal-actions">
+      <button class="btn btn-accent" id="intro-ok">Got it — continue</button>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+    </svg>
+  </div>
+  <h1>PhilFIDA Property Sticker Generator</h1>
+  <span id="row-count"></span>
+</header>
+
+<div class="container">
+
+  <!-- Steps -->
+  <div class="steps">
+    <div class="step active" id="step1-tab"><span class="num" id="s1n">1</span> Import Excel</div>
+    <div class="step" id="step2-tab"><span class="num" id="s2n">2</span> Map fields</div>
+    <div class="step" id="step3-tab"><span class="num" id="s3n">3</span> Preview &amp; export</div>
+  </div>
+
+  <!-- STEP 1: Import -->
+  <div id="step1">
+    <div class="panel">
+      <div class="panel-title">Excel file</div>
+
+      <div id="file-badge-wrap" class="hidden">
+        <div class="file-badge">
+          <svg width="16" height="16" fill="none" stroke="#16a34a" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+          <span class="fb-name" id="file-name">—</span>
+          <span class="fb-info" id="file-info"></span>
+          <button id="clear-file" title="Remove file">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="upload-zone" id="upload-zone">
+        <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <div class="uz-title">Drop your Excel file here</div>
+        <div class="uz-sub">or click to browse — .xlsx or .xls</div>
+        <input type="file" id="file-input" accept=".xlsx,.xls">
+      </div>
+
+      <div id="sheet-select-wrap" class="hidden" style="margin-top: 1rem;">
+        <label style="font-size:12px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:4px;">Sheet</label>
+        <select id="sheet-select" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;min-width:200px;"></select>
+      </div>
+    </div>
+
+    <div class="panel" id="preview-panel" style="display:none;">
+      <div class="section-head">
+        <h2>Data preview</h2>
+        <span class="badge badge-blue" id="preview-count"></span>
+      </div>
+      <div class="preview-table-wrap" id="preview-table-wrap"></div>
+      <div style="margin-top:1rem;display:flex;justify-content:flex-end;">
+        <button class="btn btn-primary" id="go-step2">Next: Map fields →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: Map fields -->
+  <div id="step2" class="hidden">
+    <div class="panel">
+      <div class="section-head">
+        <h2>Map sticker fields → Excel columns</h2>
+        <button class="btn btn-secondary" id="back-step1">← Back</button>
+      </div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:1.25rem;">
+        The sticker layout is fixed (PhilFIDA format). Pick which Excel column fills each field.
+        <strong>Tag No.</strong> is intentionally left blank.
+      </p>
+
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:6px 12px;align-items:center;margin-bottom:8px;">
+        <span class="mapping-label">Sticker field</span>
+        <span></span>
+        <span class="mapping-label">Excel column</span>
+      </div>
+
+      <div id="mapping-rows"></div>
+
+      <div style="margin-top:1.25rem;display:flex;justify-content:flex-end;gap:8px;">
+        <button class="btn btn-accent" id="go-step3" disabled>Preview stickers →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: Preview & Export -->
+  <div id="step3" class="hidden">
+    <div class="panel">
+      <div class="section-head">
+        <h2>Export settings</h2>
+        <button class="btn btn-secondary" id="back-step2">← Back</button>
+      </div>
+
+      <div class="controls-row">
+        <div class="ctrl-group">
+          <label>Region (sticker header)</label>
+          <input type="text" id="region" value="REGION XIII" style="width:200px;text-transform:uppercase;">
+        </div>
+        <div class="ctrl-group">
+          <label>Page size</label>
+          <select id="page-size">
+            <option value="legal" selected>Legal (8.5 × 14 in)</option>
+            <option value="a4">A4 (210 × 297 mm)</option>
+            <option value="letter">Letter (8.5 × 11 in)</option>
+          </select>
+        </div>
+        <div class="ctrl-group">
+          <label>Per page</label>
+          <select id="perpage">
+            <option value="3x3" selected>9 per page (3 × 3)</option>
+            <option value="3x4">12 per page (3 × 4)</option>
+            <option value="2x3">6 per page (2 × 3)</option>
+            <option value="2x4">8 per page (2 × 4)</option>
+            <option value="4x4">16 per page (4 × 4)</option>
+            <option value="auto">Fit by sticker size (2 × 3 in)</option>
+          </select>
+        </div>
+        <div class="ctrl-group">
+          <label>Sticker scale (<span id="scale-val">100</span>%)</label>
+          <input type="range" id="scale" min="50" max="200" step="5" value="100" style="width:160px;padding:0;">
+        </div>
+        <div class="ctrl-group">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:500;">
+            <input type="checkbox" id="autofit" checked style="width:auto;margin:0;"> Grow stickers to fit long text
+          </label>
+        </div>
+        <div class="ctrl-group">
+          <label>Row filter</label>
+          <select id="row-filter">
+            <option value="all">All rows</option>
+            <option value="custom">Custom range…</option>
+          </select>
+        </div>
+        <div class="ctrl-group hidden" id="range-wrap">
+          <label>Range (e.g. 1-50)</label>
+          <input type="text" id="range-input" placeholder="1-50" style="width:100px;">
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-accent" id="export-pdf">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export PDF
+        </button>
+        <span style="font-size:12px;color:var(--text-muted);" id="export-info"></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-head">
+        <h2>Sticker preview</h2>
+        <span class="badge badge-green" id="sticker-count"></span>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:1rem;">Showing first 6 stickers</p>
+      <div class="sticker-preview" id="sticker-preview"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Fixed sticker template fields ──────────────────────────
+// key       = internal id
+// label     = exactly what prints on the sticker
+// blank     = always left empty (Tag No.)
+// synonyms  = used to auto-match an Excel column by header name
+const STICKER_FIELDS = [
+  { key:'tag_no',     label:'Tag No.',             blank:true,  synonyms:['tagno','tagnumber'] },
+  { key:'property_no',label:'Property No.',         synonyms:['propertyno','propertynumber','propno'] },
+  { key:'article',    label:'Article',             synonyms:['article','brand','item'] },
+  { key:'description',label:'Description',          synonyms:['description','desc','particulars'] },
+  { key:'serial_no',  label:'Model/Serial No.',    synonyms:['modelserialno','serialno','serialnumber','serial','model','modelno'] },
+  { key:'amount',     label:'Amount',              synonyms:['amount','price','value','cost','acquisitioncost'] },
+  { key:'date_acq',   label:'Date of Acquisition', synonyms:['dateofacquisition','dateacquisition','acquisitiondate','dateacquired','date'] },
+  { key:'issued_to',  label:'Issued to',           synonyms:['issuedto','enduser','user','assignedto','accountableofficer'] },
+];
+
+let workbook = null;
+let sheetData = [];
+let headers = [];
+let mapping = {}; // { fieldKey: excelHeader }
+
+// ── Utilities ──────────────────────────────────────────────
+function showToast(msg, dur = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    document.getElementById('step'+i).classList.toggle('hidden', i !== n);
+    const tab = document.getElementById('step'+i+'-tab');
+    tab.classList.remove('active','done');
+    if (i < n) tab.classList.add('done');
+    if (i === n) tab.classList.add('active');
+    document.getElementById('s'+i+'n').textContent = i < n ? '✓' : i;
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function norm(s){ return String(s).toLowerCase().replace(/[^a-z0-9]/g,''); }
+
+function fmtAmount(v, symbol){
+  if (v === null || v === undefined || v === '') return '';
+  const raw = String(v).replace(/[₱php,\s]/gi,'');
+  const num = parseFloat(raw);
+  if (!isNaN(num) && isFinite(num) && /^[\d.]+$/.test(raw)) {
+    return symbol + num.toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+  return String(v); // already formatted / non-numeric — keep as-is
+}
+
+// value for a sticker field from a data row
+function fieldValue(field, row, symbol){
+  if (field.blank) return '';
+  const col = mapping[field.key];
+  if (!col) return '';
+  let v = row[col];
+  if (v === null || v === undefined) v = '';
+  if (field.key === 'amount') return fmtAmount(v, symbol);
+  return String(v);
+}
+
+// ── Startup notice ─────────────────────────────────────────
+document.getElementById('intro-ok').addEventListener('click', () => {
+  document.getElementById('intro-modal').classList.add('hidden');
+});
+
+// ── File handling ──────────────────────────────────────────
+const uploadZone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.classList.remove('drag');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+document.getElementById('clear-file').addEventListener('click', clearFile);
+
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      workbook = XLSX.read(e.target.result, { type: 'binary' });
+      const sheets = workbook.SheetNames;
+
+      document.getElementById('file-name').textContent = file.name;
+      document.getElementById('file-badge-wrap').classList.remove('hidden');
+      uploadZone.style.display = 'none';
+
+      const sel = document.getElementById('sheet-select');
+      sel.innerHTML = sheets.map(s => `<option>${s}</option>`).join('');
+      document.getElementById('sheet-select-wrap').classList.toggle('hidden', sheets.length <= 1);
+      sel.onchange = () => loadSheet(sel.value);
+
+      loadSheet(sheets[0]);
+    } catch(err) {
+      console.error(err);
+      showToast('Could not read file. Make sure it is .xlsx or .xls.');
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+function loadSheet(name) {
+  const ws = workbook.Sheets[name];
+  const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  if (!json.length) { showToast('Sheet appears empty.'); return; }
+
+  sheetData = json;
+  headers = Object.keys(json[0]);
+  mapping = {}; // reset so auto-match re-runs on new sheet
+  invalidateGrow();
+  document.getElementById('row-count').textContent = json.length + ' rows';
+  document.getElementById('file-info').textContent = json.length + ' rows · ' + headers.length + ' columns';
+
+  renderPreviewTable();
+  document.getElementById('preview-panel').style.display = '';
+  document.getElementById('preview-count').textContent = json.length + ' rows';
+}
+
+function clearFile() {
+  workbook = null; sheetData = []; headers = []; mapping = {};
+  document.getElementById('file-badge-wrap').classList.add('hidden');
+  uploadZone.style.display = '';
+  document.getElementById('preview-panel').style.display = 'none';
+  document.getElementById('sheet-select-wrap').classList.add('hidden');
+  fileInput.value = '';
+  document.getElementById('row-count').textContent = '';
+}
+
+function renderPreviewTable() {
+  const wrap = document.getElementById('preview-table-wrap');
+  const rows = sheetData.slice(0, 5);
+  const ths = headers.map(h => `<th>${h}</th>`).join('');
+  const trs = rows.map(r =>
+    '<tr>' + headers.map(h => `<td>${String(r[h]).slice(0,40)}</td>`).join('') + '</tr>'
+  ).join('');
+  wrap.innerHTML = `<table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
+}
+
+document.getElementById('go-step2').addEventListener('click', () => {
+  autoMap();
+  renderMappings();
+  setStep(2);
+});
+
+// ── Step 2: Mapping ────────────────────────────────────────
+function autoMap() {
+  const normHeaders = headers.map(h => ({ h, n: norm(h) }));
+  STICKER_FIELDS.forEach(f => {
+    if (f.blank) return;
+    if (mapping[f.key]) return; // keep existing choice
+    // exact label match first, then synonyms (exact, then contains)
+    const targets = [norm(f.label), ...f.synonyms];
+    let found = null;
+    for (const t of targets) {
+      const m = normHeaders.find(o => o.n === t);
+      if (m) { found = m.h; break; }
+    }
+    if (!found) {
+      for (const t of targets) {
+        const m = normHeaders.find(o => o.n.includes(t) || t.includes(o.n));
+        if (m) { found = m.h; break; }
+      }
+    }
+    if (found) mapping[f.key] = found;
+  });
+}
+
+function renderMappings() {
+  const container = document.getElementById('mapping-rows');
+  container.innerHTML = '';
+  STICKER_FIELDS.forEach(f => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:grid;grid-template-columns:1fr auto 1fr;gap:6px 12px;align-items:center;margin-bottom:8px;';
+
+    const tag = document.createElement('div');
+    tag.className = 'field-tag';
+    tag.textContent = f.label;
+
+    const arrow = document.createElement('div');
+    arrow.textContent = '→';
+    arrow.style.cssText = 'color:var(--text-muted);text-align:center;';
+
+    const right = document.createElement('div');
+    if (f.blank) {
+      right.innerHTML = '<span style="font-size:13px;color:var(--text-muted);font-style:italic;">always blank</span>';
+    } else {
+      const sel = document.createElement('select');
+      sel.className = 'col-select';
+      sel.innerHTML = '<option value="">— none —</option>' +
+        headers.map(h => `<option${h===mapping[f.key]?' selected':''}>${h}</option>`).join('');
+      sel.onchange = () => { mapping[f.key] = sel.value; checkReady(); };
+      right.appendChild(sel);
+    }
+
+    row.appendChild(tag);
+    row.appendChild(arrow);
+    row.appendChild(right);
+    container.appendChild(row);
+  });
+  checkReady();
+}
+
+function checkReady() {
+  // ready if at least Property No. is mapped (the key identifier)
+  const ready = !!mapping['property_no'] || STICKER_FIELDS.some(f => !f.blank && mapping[f.key]);
+  document.getElementById('go-step3').disabled = !ready;
+}
+
+document.getElementById('back-step1').addEventListener('click', () => setStep(1));
+
+document.getElementById('go-step3').addEventListener('click', () => {
+  renderStickerPreview();
+  updateExportInfo();
+  setStep(3);
+});
+
+// ── Step 3: Preview & Export ───────────────────────────────
+document.getElementById('back-step2').addEventListener('click', () => setStep(2));
+
+document.getElementById('row-filter').addEventListener('change', function() {
+  document.getElementById('range-wrap').classList.toggle('hidden', this.value !== 'custom');
+  invalidateGrow();
+  renderStickerPreview();
+});
+
+['page-size','range-input'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => { invalidateGrow(); renderStickerPreview(); });
+  document.getElementById(id).addEventListener('change', () => { invalidateGrow(); renderStickerPreview(); });
+});
+
+document.getElementById('autofit').addEventListener('change', () => {
+  invalidateGrow();
+  applyPreviewScale();
+  updateExportInfo();
+});
+
+document.getElementById('region').addEventListener('input', () => {
+  document.querySelectorAll('#sticker-preview .s-region').forEach(el => el.textContent = getRegion());
+});
+
+document.getElementById('perpage').addEventListener('change', () => {
+  // auto-grow only matters in "Fit by sticker size" mode
+  document.getElementById('autofit').closest('.ctrl-group').style.display =
+    document.getElementById('perpage').value === 'auto' ? '' : 'none';
+  applyPreviewScale();
+  updateExportInfo();
+});
+// hide the auto-grow toggle unless we're in "Fit by sticker size" mode
+document.getElementById('autofit').closest('.ctrl-group').style.display =
+  document.getElementById('perpage').value === 'auto' ? '' : 'none';
+
+document.getElementById('scale').addEventListener('input', () => {
+  document.getElementById('scale-val').textContent = document.getElementById('scale').value;
+  applyPreviewScale();
+  updateExportInfo();
+});
+
+// Size the on-screen preview stickers to 2in × 3in × boxScale (96px per inch).
+function applyPreviewScale(){
+  const wPx = BASE_W_IN * 96 * computeExport().boxScale;
+  document.querySelectorAll('#sticker-preview .sticker').forEach(el => {
+    el.style.width = wPx + 'px';
+  });
+}
+
+const MM_PER_IN = 25.4;
+const BASE_W_IN = 2;   // single sticker width  (inches)
+const BASE_H_IN = 3;   // single sticker height (inches)
+const MIN_PT    = 3;   // smallest font the safety-net shrink will use
+const GROW_CAP  = 3;   // never grow a sticker more than 3× to fit text
+
+function pageFormat(psKey){
+  if (psKey === 'legal')  return [215.9, 355.6];
+  if (psKey === 'letter') return [215.9, 279.4];
+  return [210, 297]; // a4
+}
+
+// font/zoom scale from the slider (controls TEXT size)
+function getFontScale(){
+  return (parseInt(document.getElementById('scale').value) || 100) / 100;
+}
+function autoFitOn(){ return document.getElementById('autofit').checked; }
+function getRegion(){
+  const v = (document.getElementById('region').value || '').trim().toUpperCase();
+  return v || 'REGION XIII';
+}
+
+// Sticker box dimensions for a given box-scale, plus how many fit per page.
+// Used by "Fit by sticker size" mode.
+function layoutDims(psKey, boxScale){
+  const [pw, ph] = pageFormat(psKey);
+  const margin = 8, gap = 4;
+  const stickerW = BASE_W_IN * MM_PER_IN * boxScale;
+  const stickerH = BASE_H_IN * MM_PER_IN * boxScale;
+  const cols = Math.max(1, Math.floor((pw - margin*2 + gap) / (stickerW + gap)));
+  const rows = Math.max(1, Math.floor((ph - margin*2 + gap) / (stickerH + gap)));
+  // centre the block of stickers so spacing is even and aligned
+  const marginX = (pw - (cols*stickerW + gap*(cols-1))) / 2;
+  const marginY = Math.max(margin, (ph - (rows*stickerH + gap*(rows-1))) / 2);
+  return { format:[pw, ph], cols, rows, stickerW, stickerH, marginX, marginY, gap };
+}
+
+// Fixed grid (e.g. 3×3 = 9 per page): tile the page exactly so every sticker
+// is the same size and perfectly aligned. Keeps the 2:3 sticker proportions.
+function gridDims(psKey, cols, rows){
+  const [pw, ph] = pageFormat(psKey);
+  const margin = 8, gap = 4;
+  const cellW = (pw - margin*2 - gap*(cols-1)) / cols;
+  const cellH = (ph - margin*2 - gap*(rows-1)) / rows;
+  // largest 2:3 box that fits the cell
+  let stickerW = Math.min(cellW, cellH * BASE_W_IN / BASE_H_IN);
+  let stickerH = stickerW * BASE_H_IN / BASE_W_IN;
+  const marginX = (pw - (cols*stickerW + gap*(cols-1))) / 2;
+  const marginY = (ph - (rows*stickerH + gap*(rows-1))) / 2;
+  return { format:[pw, ph], cols, rows, stickerW, stickerH, marginX, marginY, gap };
+}
+
+// A reusable hidden jsPDF doc (with fonts) used only to measure text fit.
+let _measureDoc = null, _measureF = null;
+function getMeasureDoc(){
+  if (_measureDoc) return { doc:_measureDoc, F:_measureF };
+  const { jsPDF } = window.jspdf;
+  const d = new jsPDF({ unit:'mm', format:[200,200] });
+  const real = registerFonts(d);
+  _measureF = real ? { body:'Cambria', head:'ArialBlack', peso:'₱' }
+                   : { body:'times',   head:'helvetica', peso:'P ' };
+  _measureDoc = d;
+  return { doc:d, F:_measureF };
+}
+
+// Smallest growth factor (≥1) so NO cell needs font shrinking.
+// Independent of the slider (box and font scale together cancel out),
+// so we can cache it per dataset.
+let _gfCache = null;
+function invalidateGrow(){ _gfCache = null; }
+function computeGrow(){
+  if (!autoFitOn()) return 1;
+  if (_gfCache != null) return _gfCache;
+  const data = getFilteredRows();
+  const { doc, F } = getMeasureDoc();
+  let gf = 1;
+  while (gf <= GROW_CAP) {
+    const sw = BASE_W_IN * MM_PER_IN * gf, sh = BASE_H_IN * MM_PER_IN * gf;
+    let ok = true;
+    for (const row of data) {
+      if (!drawSticker(doc, 0, 0, sw, sh, row, F, 1, true).allFit) { ok = false; break; }
+    }
+    if (ok) break;
+    gf = Math.round((gf + 0.1) * 100) / 100;
+  }
+  _gfCache = Math.min(gf, GROW_CAP);
+  return _gfCache;
+}
+
+// Resolve final scales/dimensions for preview + export.
+function computeExport(){
+  const psKey = document.getElementById('page-size').value;
+  const slider = getFontScale();
+  const mode = document.getElementById('perpage').value;
+
+  if (mode === 'auto') {
+    const boxScale = slider * computeGrow();
+    return { psKey, mode, drawFontScale: slider, boxScale, dims: layoutDims(psKey, boxScale) };
+  }
+
+  // fixed grid → tile the page; text scales with the cell so the design
+  // looks consistent, and fitCell shrinks any overflow as a safety net.
+  const [cols, rows] = mode.split('x').map(Number);
+  const dims = gridDims(psKey, cols, rows);
+  const boxScale = dims.stickerW / (BASE_W_IN * MM_PER_IN);
+  const drawFontScale = slider * (dims.stickerH / (BASE_H_IN * MM_PER_IN));
+  return { psKey, mode, drawFontScale, boxScale, dims };
+}
+
+// Fit text into a cell: keep the base font if it fits, otherwise shrink
+// (down to MIN_PT) so it can NEVER overflow the cell. Returns {pt, lines, fit}.
+function fitCell(doc, text, font, style, maxW, maxH, basePt){
+  text = String(text);
+  if (!text) return { pt:basePt, lines:[], fit:true };
+  let pt = basePt;
+  doc.setFont(font, style);
+  while (pt >= MIN_PT) {
+    doc.setFontSize(pt);
+    const lines = doc.splitTextToSize(text, maxW);
+    const lineH = pt * 0.3528 * 1.15;       // mm per line
+    let widest = 0;
+    for (const ln of lines) widest = Math.max(widest, doc.getTextWidth(ln));
+    if (lines.length * lineH <= maxH + 0.05 && widest <= maxW + 0.05) {
+      return { pt, lines, fit: pt >= basePt - 0.001 };
+    }
+    pt -= 0.3;
+  }
+  doc.setFontSize(MIN_PT);
+  return { pt:MIN_PT, lines: doc.splitTextToSize(text, maxW), fit:false };
+}
+
+function getFilteredRows() {
+  const filter = document.getElementById('row-filter').value;
+  if (filter === 'custom') {
+    const rangeStr = document.getElementById('range-input').value.trim();
+    const match = rangeStr.match(/^(\d+)-(\d+)$/);
+    if (match) {
+      const from = Math.max(1, parseInt(match[1])) - 1;
+      const to = Math.min(sheetData.length, parseInt(match[2]));
+      return sheetData.slice(from, to);
+    }
+  }
+  return sheetData;
+}
+
+function updateExportInfo() {
+  const rows = getFilteredRows();
+  const { mode, boxScale, dims } = computeExport();
+  const perPage = dims.cols * dims.rows;
+  const pages = Math.ceil(rows.length / perPage) || 0;
+  const grew = mode === 'auto' && autoFitOn() && computeGrow() > 1.001;
+  document.getElementById('export-info').textContent =
+    rows.length + ' stickers · ' + perPage + ' per page · ' + pages + ' page' + (pages!==1?'s':'') +
+    (grew ? ' · auto-grown to ' + Math.round(boxScale*100) + '% to fit text' : '');
+  document.getElementById('sticker-count').textContent = rows.length + ' stickers';
+}
+
+function renderStickerPreview() {
+  const container = document.getElementById('sticker-preview');
+  container.innerHTML = '';
+  const rows = getFilteredRows().slice(0, 6);
+
+  if (!rows.length) {
+    container.innerHTML = '<div class="empty">No data to preview.</div>';
+    return;
+  }
+
+  rows.forEach(row => {
+    const s = document.createElement('div');
+    s.className = 'sticker';
+
+    let gridRows = '';
+    STICKER_FIELDS.forEach(f => {
+      const val = fieldValue(f, row, '₱');
+      const isDesc = f.key === 'description';
+      gridRows += `<div class="s-row${isDesc?' desc':''}"><div class="s-k">${f.label}</div><div class="s-v">${val || '&nbsp;'}</div></div>`;
+    });
+
+    s.innerHTML =
+      `<div class="s-title">PhilFIDA PROPERTY</div>` +
+      `<div class="s-region">${getRegion()}</div>` +
+      `<div class="s-grid">${gridRows}</div>` +
+      `<div class="s-years">2025 - 2026 - 2027 - 2028 - 2029 - 2030 - 2031</div>` +
+      `<div class="s-sign"><div>PhilFIDA</div><div>COA</div></div>` +
+      `<div class="s-foot">PLEASE DO NOT REMOVE</div>`;
+
+    container.appendChild(s);
+  });
+
+  applyPreviewScale();
+  updateExportInfo();
+}
+
+// ── PDF Export ─────────────────────────────────────────────
+document.getElementById('export-pdf').addEventListener('click', exportPDF);
+
+// Register the embedded TTFs (Cambria body, Arial Black heading) into a jsPDF doc.
+// Returns true if real fonts are available; false → caller falls back to built-ins.
+function registerFonts(doc){
+  const F = window.STICKER_FONTS;
+  if (!F) return false;
+  try {
+    doc.addFileToVFS('Cambria.ttf', F.cambriaR);
+    doc.addFont('Cambria.ttf', 'Cambria', 'normal');
+    doc.addFileToVFS('Cambria-Bold.ttf', F.cambriaB);
+    doc.addFont('Cambria-Bold.ttf', 'Cambria', 'bold');
+    doc.addFileToVFS('ArialBlack.ttf', F.arialBlack);
+    doc.addFont('ArialBlack.ttf', 'ArialBlack', 'normal');
+    return true;
+  } catch(e) { console.error('font register failed', e); return false; }
+}
+
+// Draw one sticker into the box at (x,y) sized (w,h).
+//   F         = { body, head, peso } font names + currency symbol
+//   fontScale = TEXT zoom (from slider); independent of the box size
+//   measure   = when true, nothing is drawn; only fit is computed
+// Returns { allFit } — false if any cell had to shrink its text to fit.
+function drawSticker(doc, x, y, w, h, row, F, fontScale, measure) {
+  const fs = fontScale;
+  const PAD = 2;
+  const innerX = x + PAD, innerW = w - PAD*2;
+  let allFit = true;
+
+  if (!measure) { doc.setDrawColor(90); doc.setLineWidth(0.4); doc.rect(x, y, w, h); }
+
+  let cy = y + 5*fs;
+
+  // Header (Arial Black) — sized by fontScale
+  if (!measure) {
+    doc.setTextColor(40,40,40);
+    doc.setFont(F.head,'normal'); doc.setFontSize(11*fs);
+    doc.text('PhilFIDA PROPERTY', x + w/2, cy, { align:'center' });
+    doc.setFontSize(9*fs);
+    doc.text(getRegion(), x + w/2, cy + 4.5*fs, { align:'center' });
+  }
+  cy += 4.5*fs + 3*fs;
+
+  // ── Geometry budget ── (extra box height flows into the grid)
+  const footerH = 22*fs;
+  const gridTop = cy;
+  const gridBottom = y + h - footerH;
+  const gridH = Math.max(8, gridBottom - gridTop);
+
+  const weights = STICKER_FIELDS.map(f => f.key === 'description' ? 2.6 : 1);
+  const totalW = weights.reduce((a,b)=>a+b,0);
+  const labelColW = innerW * 0.42;
+  const valColW = innerW - labelColW;
+
+  if (!measure) {
+    doc.setDrawColor(120); doc.setLineWidth(0.25);
+    doc.rect(innerX, gridTop, innerW, gridH);
+    doc.line(innerX + labelColW, gridTop, innerX + labelColW, gridBottom);
+  }
+
+  const labelBase = 6.2 * fs;
+  const valBase   = 6.2 * fs;
+
+  let ry = gridTop;
+  STICKER_FIELDS.forEach((f, i) => {
+    const rh = gridH * weights[i] / totalW;
+    const cellH = rh - 1.6*fs;       // padding top+bottom
+
+    if (i > 0 && !measure) { doc.setDrawColor(160); doc.setLineWidth(0.15); doc.line(innerX, ry, innerX + innerW, ry); }
+
+    // label (Cambria bold)
+    const lab = fitCell(doc, f.label, F.body, 'bold', labelColW - 3, cellH, labelBase);
+    if (!lab.fit) allFit = false;
+
+    // value (Cambria normal)
+    const val = fieldValue(f, row, F.peso);
+    const v = val ? fitCell(doc, val, F.body, 'normal', valColW - 3, cellH, valBase)
+                  : { pt:valBase, lines:[], fit:true };
+    if (!v.fit) allFit = false;
+
+    if (!measure) {
+      const labTop = ry + 0.8*fs + lab.pt*0.3528;
+      doc.setFont(F.body,'bold'); doc.setFontSize(lab.pt); doc.setTextColor(40,40,40);
+      doc.text(lab.lines, innerX + 1.5, labTop);
+
+      if (val) {
+        const valTop = ry + 0.8*fs + v.pt*0.3528;
+        doc.setFont(F.body,'normal'); doc.setFontSize(v.pt); doc.setTextColor(20,20,20);
+        doc.text(v.lines, innerX + labelColW + 1.5, valTop);
+      }
+    }
+    ry += rh;
+  });
+
+  if (measure) return { allFit };
+
+  // ── Footer block ──
+  let fy = gridBottom + 4*fs;
+  doc.setFont(F.body,'bold'); doc.setFontSize(6*fs); doc.setTextColor(40,40,40);
+  doc.text('2025 - 2026 - 2027 - 2028 - 2029 - 2030 - 2031', x + w/2, fy, { align:'center' });
+
+  fy += 7*fs;
+  const sigW = innerW * 0.36;
+  const leftCx  = innerX + innerW*0.25;
+  const rightCx = innerX + innerW*0.75;
+  doc.setDrawColor(60); doc.setLineWidth(0.25);
+  doc.line(leftCx - sigW/2, fy, leftCx + sigW/2, fy);
+  doc.line(rightCx - sigW/2, fy, rightCx + sigW/2, fy);
+  doc.setFontSize(6.5*fs);
+  doc.text('PhilFIDA', leftCx, fy + 3*fs, { align:'center' });
+  doc.text('COA', rightCx, fy + 3*fs, { align:'center' });
+
+  fy += 8*fs;
+  doc.setFont(F.body,'bold'); doc.setFontSize(6.5*fs); doc.setTextColor(70,70,70);
+  doc.text('PLEASE DO NOT REMOVE', x + w/2, fy, { align:'center' });
+
+  return { allFit };
+}
+
+async function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  const { psKey, drawFontScale, dims } = computeExport();
+  const { format, cols, rows: rowsPerPage, stickerW, stickerH, marginX, marginY, gap } = dims;
+  const [pw, ph] = format;
+  const perPage = cols * rowsPerPage;
+
+  const data = getFilteredRows();
+  if (!data.length) { showToast('No rows to export.'); return; }
+
+  const btn = document.getElementById('export-pdf');
+  btn.disabled = true; btn.textContent = 'Generating…';
+  await new Promise(r => setTimeout(r, 20));
+
+  try {
+    const doc = new jsPDF({ unit:'mm', format: psKey === 'a4' ? 'a4' : [pw, ph] });
+    const hasReal = registerFonts(doc);
+    const F = hasReal
+      ? { body:'Cambria', head:'ArialBlack', peso:'₱' }
+      : { body:'times',   head:'helvetica', peso:'P ' };
+    doc.setFont(F.body);
+
+    data.forEach((row, idx) => {
+      if (idx > 0 && idx % perPage === 0) doc.addPage(psKey === 'a4' ? 'a4' : [pw, ph]);
+      const pos = idx % perPage;
+      const c = pos % cols;
+      const r = Math.floor(pos / cols);
+      const x = marginX + c * (stickerW + gap);
+      const y = marginY + r * (stickerH + gap);
+      drawSticker(doc, x, y, stickerW, stickerH, row, F, drawFontScale, false);
+    });
+
+    doc.save('philfida-property-stickers.pdf');
+    showToast('PDF exported — ' + data.length + ' stickers');
+  } catch(err) {
+    console.error(err);
+    showToast('Export failed. Please try again.');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export PDF`;
+}
+</script>
+</body>
+</html>
